@@ -73,7 +73,7 @@ class KioskStore:
             raise ValueError("Menu item not found")
         if not menu_item.is_available:
             raise ValueError("Menu item is not available")
-
+        
         order_item = OrderItem(
             menu_item_id=menu_item.id,
             name=menu_item.name,
@@ -124,3 +124,44 @@ class KioskStore:
         if order is None:
             raise ValueError("Order not found")
         return order
+    
+    # 새 메뉴 추가
+    def add_menu_item(self, name: str, price: int, category: str | None = None, description: str | None = None) -> MenuItem:
+        if price < 0:
+            raise ValueError("가격은 0원 이상이어야 합니다.")
+        
+        next_id = max(self._menu.keys(), default=0) + 1
+
+        item = MenuItem(
+            id=next_id,
+            name=name,
+            price=price,
+            category=category,
+            description=description,
+        )
+        self._menu[next_id] = item
+        return item
+    
+    # 메뉴 수정
+    def update_menu_item(self, menu_id: int, name: str, price: int, category: str | None = None, description: str | None = None, is_available: bool = True) -> MenuItem:
+        if menu_id not in self._menu:
+            raise ValueError(f"메뉴 {menu_id}을(를) 찾을 수 없습니다.")
+        if price < 0:
+            raise ValueError("가격은 0원 이상이어야 합니다.")
+        # MenuItem이 frozen=True 설정되어 있으므로, 객체 새로 생성 후 덮어쓰기
+        updated_item = MenuItem(
+            id=menu_id,
+            name=name,
+            price=price,
+            category=category,
+            description=description,
+            is_available=is_available,
+        )
+        self._menu[menu_id] = updated_item
+        return updated_item
+    
+    # 메뉴 삭제
+    def delete_menu_item(self, menu_id: int) -> None:
+        if menu_id not in self._menu:
+            raise ValueError(f"메뉴 {menu_id}을(를) 찾을 수 없습니다.")
+        del self._menu[menu_id]

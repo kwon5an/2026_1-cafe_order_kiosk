@@ -11,7 +11,7 @@ from cafe_order_kiosk.utils import format_money
 @dataclass
 class CLIState:
     current_order_id: int | None = None
-
+    is_admin: bool = False # 관리자 권한 여부 (기본값: False)
 
 def run_cli() -> int:
     store = KioskStore.with_default_menu()
@@ -45,6 +45,18 @@ def run_cli() -> int:
             handle_orders(store, args)
         elif command in {"결제", "pay"}:
             handle_pay(store, state, args)
+        elif command in {"메뉴추가", "addmenu"}:
+            if not chk_admin_perm(state):
+                continue
+            handle_add_menu(store, args)
+        elif command in {"메뉴수정", "updatemenu"}:
+            if not chk_admin_perm(state):
+                continue
+            handle_update_menu(store, args)
+        elif command in {"메뉴삭제", "deletemenu"}:
+            if not chk_admin_perm(state):
+                continue
+            handle_delete_menu(store, args)
         else:
             print("알 수 없는 명령입니다. '도움말'을 입력하세요.")
     print("종료합니다.")
@@ -64,6 +76,9 @@ def print_help() -> None:
     print("\t결제 <방법> [금액]")
     print("\t도움말")
     print("\t종료")
+    print("\t메뉴 추가 <이름> <가격> [카테고리] [설명]")
+    print("\t메뉴 수정 <메뉴_id> <이름> <가격> [카테고리] [설명] [품절여부:y/n]")
+    print("\t메뉴 삭제 <메뉴_id>")
 
 
 def handle_menu(store: KioskStore) -> None:
@@ -261,3 +276,94 @@ def format_status(status: OrderStatus) -> str:
         OrderStatus.CANCELED: "취소",
     }
     return status_map.get(status, status.value)
+
+# 새 메뉴 추가
+def handle_add_menu(store: KioskStore, args: list[str]) -> None:
+    if len(args) < 2:
+        print("사용법: 메뉴추가 <이름> <가격> [카테고리] [설명]")
+        return
+
+    name = args[0]
+    try:
+        price = int(args[1])
+    except ValueError:
+        print("가격은 정수여야 합니다.")
+        return
+
+    category = args[2] if len(args) > 2 else None
+    description = args[3] if len(args) > 3 else None
+
+    try:
+        item = store.add_menu_item(name, price, category, description)
+        print(f"메뉴가 성공적으로 추가되었습니다: [{item.id}] {item.name} - {format_money(item.price)}원")
+    except ValueError as exc:
+        print(str(exc))
+
+# 기존 메뉴 수정 
+def handle_update_menu(store: KioskStore, args: list[str]) -> None:
+    if len(args) < 3:
+        print("사용법: 메뉴수정 <메뉴_id> <이름> <가격> [카테고리] [설명] [품절여부:y/n]")
+        return
+
+    try:
+        menu_id = int(args[0])
+        price = int(args[2])
+    except ValueError:
+        print("메뉴 ID와 가격은 정수여야 합니다.")
+        return
+
+    name = args[1]
+    category = args[3] if len(args) > 3 else None
+    description = args[4] if len(args) > 4 else None
+    
+    # 품절 여부 수정
+    is_available = True
+    if len(args) > 5:
+        is_available = args[5].lower() not in {"n", "no", "품절"}
+
+    try:
+        item = store.update_menu_item(menu_id, name, price, category, description, is_available)
+        status_str = "판매중" if item.is_available else "품절"
+        print(f"메뉴가 수정되었습니다: [{item.id}] {item.name} - {format_money(item.price)}원 ({status_str})")
+    except ValueError as exc:
+        print(str(exc))
+
+# 기존 메뉴 삭제 
+def handle_delete_menu(store: KioskStore, args: list[str]) -> None:
+    if not args:
+        print("사용법: 메뉴삭제 <메뉴_id>")
+        return
+
+    try:
+        menu_id = int(args[0])
+    except ValueError:
+        print("메뉴 ID는 정수여야 합니다.")
+        return
+
+    try:
+        store.delete_menu_item(menu_id)
+        print(f"메뉴 ID {menu_id}가 삭제되었습니다.")
+    except ValueError as exc:
+        print(str(exc))
+
+
+ADMIN_PASSWORD = "q1w2e3r4"
+
+# 관리자 모드로 전환
+def handle_admin(state: CLIState) -> None:
+    if state.is_admin:
+        print("이미 관리자 모드입니다.")
+        return
+    password = input("관리자 비밀번호를 입력하세요: ")
+    if password == ADMIN_PASSWORD:
+        state.is_admin = True
+        print("관리자 모드로 전환되었습니다.")
+    else:
+        print("비밀번호가 일치하지 않습니다.")
+
+# 관리자 권한 체크
+def chk_admin_perm(state: CLIState) -> bool:
+    if not state.is_admin:
+        print("권한이 없습니다. '관리자' 명령어를 통해 관리자 모드로 전환해주세요")
+        return False
+    return True
