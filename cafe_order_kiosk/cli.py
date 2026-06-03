@@ -57,6 +57,10 @@ def run_cli() -> int:
             if not chk_admin_perm(state):
                 continue
             handle_delete_menu(store, args)
+        elif command in {"관리자", "admin"}:
+            handle_admin(state)
+        elif command in {"로그아웃", "logout"}:
+            handle_admin_logout(state)
         else:
             print("알 수 없는 명령입니다. '도움말'을 입력하세요.")
     print("종료합니다.")
@@ -79,6 +83,8 @@ def print_help() -> None:
     print("\t메뉴 추가 <이름> <가격> [카테고리] [설명]")
     print("\t메뉴 수정 <메뉴_id> <이름> <가격> [카테고리] [설명] [품절여부:y/n]")
     print("\t메뉴 삭제 <메뉴_id>")
+    print("\t관리자")
+    print("\t로그아웃")
 
 
 def handle_menu(store: KioskStore) -> None:
@@ -360,6 +366,14 @@ def handle_admin(state: CLIState) -> None:
         print("관리자 모드로 전환되었습니다.")
     else:
         print("비밀번호가 일치하지 않습니다.")
+
+# 관리자 권한 종료
+def handle_admin_logout(state: CLIState) -> None:
+    if not state.is_admin:
+        print("현재 관리자 모드가 아닙니다.")
+        return
+    state.is_admin = False
+    print("관리자 모드에서 로그아웃 하였습니다.")
 
 # 관리자 권한 체크
 def chk_admin_perm(state: CLIState) -> bool:
