@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+import json
+
 from collections.abc import Iterable
 
 from cafe_order_kiosk.models import MenuItem, Order, OrderItem, OrderStatus, Payment
@@ -25,6 +28,30 @@ class KioskStore:
         self._orders: dict[int, Order] = {}
         self._next_order_id = 1
 
+        # 회원 포인트 데이터 파일 경로 및 딕셔너리 초기화
+        self._member_file = "member.json"
+        self._points: dict[str, int] = self.load_members()
+        self.current_phone: str | None = None
+
+    # JSON 파일 저장
+    def save_members(self) -> None:
+        with open (self._member_file, "w", encoding="utf-8") as f:
+            json.dump(self._points, f, ensure_ascii=False, indent='\t')
+
+    # JSON 파일 불러오기
+    def load_members(self) -> dict[str, int]:
+        if not os.path.exists(self._member_file):
+            return {}
+        try:
+            with open(self._member_file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+        
+    # 적립금 조회
+    def get_points(self, phone: str) -> int:
+        return self._points.get(phone, 0)
+        
     @classmethod
     def with_default_menu(cls) -> KioskStore:
         return cls(menu_items=DEFAULT_MENU)
@@ -117,6 +144,13 @@ class KioskStore:
         order.status = OrderStatus.PAID
         order.paid_at = utc_now()
         order.payment = Payment(method=method, amount=amount, paid_at=order.paid_at)
+
+        # 결제 완료 시 등록된 전화번호가 있다면 10% 포인트 적립
+        if self.current_phone:
+            earned_points = int(amount * 0.1)
+            self._points[self.current_phone] = self.get_points(self.current_phone) + earned_points
+            self.save_members()
+
         return order
 
     def _require_order(self, order_id: int) -> Order:

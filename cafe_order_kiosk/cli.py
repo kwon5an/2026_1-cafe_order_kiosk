@@ -45,6 +45,10 @@ def run_cli() -> int:
             handle_orders(store, args)
         elif command in {"결제", "pay"}:
             handle_pay(store, state, args)
+        elif command == "적립":
+            handle_point_register(store, args)
+        elif command == "적립조회":
+            handle_point_lookup(store, args)
         else:
             print("알 수 없는 명령입니다. '도움말'을 입력하세요.")
     print("종료합니다.")
@@ -62,7 +66,9 @@ def print_help() -> None:
     print("\t주문 취소")
     print("\t주문목록 목록 [진행중|결제완료|취소]")
     print("\t결제 <방법> [금액]")
-    print("\t도움말")
+    print("\t적립 <전화번호>")
+    print("\t적립조회 <전화번호>")
+    print("\도움말")
     print("\t종료")
 
 
@@ -204,6 +210,16 @@ def handle_pay(store: KioskStore, state: CLIState, args: list[str]) -> None:
 
     try:
         store.pay_order(order.id, method, amount)
+
+        # 결제 성공 시, 연동된 전화번호가 있다면 적립 후 결과 피드백 출력 
+        if store.current_phone:
+            earned = int(amount * 0.1)
+            total_pt = store.get_points(store.current_phone)
+            print(f"[{store.current_phone}] 회원님께 {format_money(earned)}원이 적립되었습니다.")
+            print(f"현재 보유 적립금: {format_money(total_pt)}원")
+
+            # 다음 사용자를 위해 연동 번호 초기화 
+            store.current_phone = None
     except ValueError as exc:
         print(str(exc))
         return
@@ -261,3 +277,25 @@ def format_status(status: OrderStatus) -> str:
         OrderStatus.CANCELED: "취소",
     }
     return status_map.get(status, status.value)
+
+# 현재 진행중인 주문에 전화번호 임시 연동
+def handle_point_register(store: KioskStore, args: list[str]) -> None:
+    if not args:
+        print("시용법: 적립 <전화번호>")
+        return
+    
+    phone = args[0]
+    store.current_phone = phone
+    current_pt = store.get_points(phone)
+    print(f"회원 {phone}님\n현재 보유 적립금: {format_money(current_pt)}원")
+    print("결제 시 결제 금액의 10%가 적립됩니다.")
+
+# 현재 적립금 조회
+def handle_point_lookup(store: KioskStore, args: list[str]) -> None:
+    if not args:
+        print("사용법: 적립조회 <전화번호>")
+        return
+    
+    phone = args[0]
+    current_pt = store.get_points(phone)
+    print(f"현재 보유 적립금: {format_money(current_pt)}원")
